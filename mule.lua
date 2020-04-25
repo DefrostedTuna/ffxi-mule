@@ -114,31 +114,36 @@ end
 -- @return string
 function target_mob(id)
   local player = windower.ffxi.get_player()
-  local target = windower.ffxi.get_mob_by_id(id)
-  
-  if not target then
+  local desired_target = windower.ffxi.get_mob_by_id(id)
+  local current_target = windower.ffxi.get_mob_by_target('t')
+
+  if not desired_target then
     return
   end
   
-  if target.in_party or target.in_alliance then
-    return target.name
+  -- We can cast directly on party and alliance members.
+  if desired_target.in_party or desired_target.in_alliance then
+    return desired_target.name
   end
 
-  -- This will target the desired mob, although
-  -- it will also lock on by default for enemies.
-  packets.inject(packets.new('incoming', 0x058, {
-    ['Player'] = player.id,
-    ['Target'] = target.id,
-    ['Player Index'] = player.index,
-  }))
+  -- We only want to force a target onto the player if needed.
+  if not current_target or current_target.id ~= desired_target.id then
+    -- This will target the desired mob, although
+    -- it will also lock on by default for enemies.
+    packets.inject(packets.new('incoming', 0x058, {
+      ['Player'] = player.id,
+      ['Target'] = desired_target.id,
+      ['Player Index'] = player.index,
+    }))
   
-  -- Stop following.
-  -- Else characters will chase their targets.
-  windower.ffxi.follow()
-
-  -- Disable lockon sent by the last command if the target
-  -- is not a character in the current party or alliance.
-  windower.send_command('wait 1; input /lockon')
+    -- Stop following.
+    -- Else characters will chase their targets.
+    windower.ffxi.follow()
+  
+    -- Disable lockon sent by the last command if the target
+    -- is not a character in the current party or alliance.
+    windower.send_command('wait 1; input /lockon')
+  end
 
   return '<t>'
 end 
@@ -289,7 +294,7 @@ function delegate_command(declaration, action, target)
     -- If the target needs to be acquired first,
     -- add a delay before issuing the command.
     if mob_id then
-      command_string = 'wait 0.5; ' .. command_string
+      command_string = 'wait 1; ' .. command_string
     end
 
     windower.send_command(command_string)
